@@ -10,12 +10,10 @@ public class AngryBird {
     static JFrame frm = new JFrame("憤怒鳥");
     static int ballX = 120, ballY = 1160; // 小鳥的初始位置
     static int enemyX = 1800, enemyY = 1160; // 敵人的初始位置
-    static int enemyState = 0; // 0: 正常, 1: 煙霧, 2: 消失
+    static Enemy enemy = new Enemy(enemyX, enemyY); // 初始化敵人
     static JPanel pne = new JPanel() {
         Image bgImage = new ImageIcon("src/img/BG.jpg").getImage();
         Image ballImage = new ImageIcon("src/img/RedBird.png").getImage();
-        Image enemyImage = new ImageIcon("src/img/pig.png").getImage();
-        Image smokeImage = new ImageIcon("src/img/cloud1.png").getImage(); // 煙霧圖片
         int offsetX, offsetY; // 滑鼠拖曳偏移量
         boolean dragging = false;
 
@@ -69,25 +67,20 @@ public class AngryBird {
 
         // 檢測小鳥與敵人是否碰撞
         private void checkCollision() {
-            if (enemyState == 0) { // 敵人處於正常狀態時檢測碰撞
-                Rectangle birdRect = new Rectangle(ballX, ballY, 32, 32);
-                Rectangle enemyRect = new Rectangle(enemyX, enemyY, 32, 32);
-
-                if (birdRect.intersects(enemyRect)) {
-                    enemyState = 1; // 切換到煙霧狀態
-                    Timer timer = new Timer();
-                    timer.schedule(new TimerTask() {
-                        @Override
-                        public void run() {
-                            enemyState = 2; // 煙霧狀態後設為消失
-                            repaint();
-                        }
-                    }, 150); // 150 毫秒後切換狀態
-                }
-            }
-
-            // 增加木塊碰撞檢測
             Rectangle birdRect = new Rectangle(ballX, ballY, 32, 32);
+            Rectangle enemyRect = new Rectangle(enemy.x, enemy.y, 32, 32);
+
+            if (birdRect.intersects(enemyRect)) {
+                enemy.setState(1); // 豬被擊中，切換到煙霧狀態
+                Timer timer = new Timer();
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        enemy.setState(2); // 煙霧顯示一段時間後，切換為消失
+                        repaint();
+                    }
+                }, 150); // 150毫秒後切換狀態
+            }
         }
 
         @Override
@@ -98,21 +91,13 @@ public class AngryBird {
             double scaleX = (double) getWidth() / 2560;
             double scaleY = (double) getHeight() / 1440;
 
-            int scaledEnemyX = (int) (enemyX * scaleX);
-            int scaledEnemyY = (int) (enemyY * scaleY);
+            // 繪製敵人（豬）
+            enemy.draw(g, scaleX, scaleY);
 
+            // 繪製小鳥
             int scaledBallX = (int) (ballX * scaleX);
             int scaledBallY = (int) (ballY * scaleY);
-
-            // 根據敵人狀態繪製
-            if (enemyState == 0) {
-                g.drawImage(enemyImage, scaledEnemyX, scaledEnemyY, 32, 32, this); // 正常狀態
-            } else if (enemyState == 1) {
-                g.drawImage(smokeImage, scaledEnemyX, scaledEnemyY, 32, 32, this); // 煙霧狀態
-            }
-
-            g.drawImage(ballImage, scaledBallX, scaledBallY, 32, 32, this); // 繪製小鳥
-
+            g.drawImage(ballImage, scaledBallX, scaledBallY, 32, 32, this);
         }
     };
 
@@ -127,9 +112,7 @@ public class AngryBird {
         btn.addActionListener(e -> {
             ballX = 120;
             ballY = 1160;
-            enemyX = 1800;
-            enemyY = 1160;
-            enemyState = 0; // 重置敵人狀態為正常
+            enemy.reset(); // 重置敵人
             pne.repaint();
         });
 
@@ -138,6 +121,57 @@ public class AngryBird {
         frm.setVisible(true);
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
+}
 
-    
+// 豬的類別
+class Enemy {
+    int x, y;
+    int state; // 0: 正常, 1: 煙霧, 2: 消失
+    Image enemyImage, smokeImage;
+
+    public Enemy(int x, int y) {
+        this.x = x;
+        this.y = y;
+        this.state = 0; // 初始狀態為正常
+        this.enemyImage = new ImageIcon("src/img/pig.png").getImage();
+        this.smokeImage = new ImageIcon("src/img/cloud1.png").getImage();
+    }
+
+    // 更新敵人狀態（如煙霧效果）
+    public void updateState() {
+        if (state == 1) {
+            // 煙霧效果持續一段時間後消失
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    state = 2; // 設為消失
+                }
+            }, 150); // 煙霧效果顯示150毫秒
+        }
+    }
+
+    // 繪製敵人
+    public void draw(Graphics g, double scaleX, double scaleY) {
+        int scaledX = (int) (x * scaleX);
+        int scaledY = (int) (y * scaleY);
+
+        if (state == 0) {
+            g.drawImage(enemyImage, scaledX, scaledY, 32, 32, null); // 正常顯示
+        } else if (state == 1) {
+            g.drawImage(smokeImage, scaledX, scaledY, 32, 32, null); // 煙霧顯示
+        }
+    }
+
+    // 設置豬的狀態
+    public void setState(int state) {
+        this.state = state;
+    }
+
+    // 重置豬的狀態
+    public void reset() {
+        this.state = 0;
+        this.x = 1800;
+        this.y = 1160;
+    }
 }
