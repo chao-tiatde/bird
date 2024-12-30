@@ -248,23 +248,20 @@ class Enemy {
         this.smokeImage = new ImageIcon("src/img/cloud1.png").getImage();
     }
 
-    // 更新敵人狀態（煙霧效果）
-    public void updateState() {
-        if (state == 1 && !isTimerRunning) {
-            isTimerRunning = true;
-            
-            // 創建新的計時器
-            smokeTimer = new Timer(150, e -> {
-                state = 2;  // 切換到消失狀態
-                isTimerRunning = false;
-                ((Timer)e.getSource()).stop();  // 停止計時器
-                System.out.println("敵人消失！");
-            });
-            
-            smokeTimer.setRepeats(false);  // 設置只執行一次
-            smokeTimer.start();
-        }
+   // 更新敵人狀態（如煙霧效果）
+   public void updateState() {
+    // 如果敵人狀態是煙霧且計時器尚未運行
+    if (state == 1) {
+       
+        Timer timer = new Timer(150, e -> { // 設定150毫秒後觸發
+            state = 2; // 切換到消失狀態
+          
+            System.out.println("敵人變成消失狀態！");
+        });
+        timer.setRepeats(false); // 設置計時器只觸發一次
+        timer.start(); // 啟動計時器
     }
+}
 
     // 繪製敵人
     public void draw(Graphics g, double scaleX, double scaleY) {
