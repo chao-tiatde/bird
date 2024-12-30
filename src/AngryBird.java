@@ -105,7 +105,7 @@ public class AngryBird {
                         System.out.println("Calculated vx: " + vx + ", vy: " + vy);
                         System.out.println("Calculated e.getX(): " + e.getX() + ", offsetX: " + offsetX+ "ballX " + ballX);
                         // 在放開滑鼠後開始計時器
-                        timer = new Timer(10, evt -> {
+                        timer = new Timer(1, _ -> {
                             moveBall();
                             checkCollision(); // 在每次更新小鳥位置後立即檢測碰撞
                         });
@@ -198,6 +198,16 @@ public class AngryBird {
                     block.hit(birdSpeedX, birdSpeedY, birdRect); 
                     System.out.println("木板被擊倒！");
                 }
+            }
+
+            // 檢查木頭與豬的碰撞
+            Rectangle blockRect = new Rectangle(wood.x, wood.y, wood.width, wood.height);
+            Rectangle enemyRect = new Rectangle(enemy.x, enemy.y, 32, 32);
+            if (blockRect.intersects(enemyRect)) {
+                System.out.println("木頭碰到豬！");
+                wood.y = enemy.y - wood.height; // 木頭疊在豬的上方
+                wood.vy = 0; // 停止垂直速度
+                wood.vx = 0; // 停止水平速度
             }
         
             // 可能還有其他碰撞檢查
@@ -338,6 +348,10 @@ public class AngryBird {
     public static void initWoodBlocks() {
         woodenBlocks.add(new WoodenBlock(950, 530, 30, 80));
         woodenBlocks.add(new WoodenBlock(1050, 530, 30, 80));
+        WoodenBlock block = new WoodenBlock(1000, 485, 30, 100);
+        block.rotationAngle = Math.PI / 2; // 初始傾斜 90 度
+        block.initialRotationAngle = Math.PI / 2; // 記錄初始角度
+        woodenBlocks.add(block);
     }
 }
 
@@ -353,7 +367,6 @@ class Enemy {
 
     private Timer smokeTimer;
     boolean isTimerRunning = false; // 計時器是否正在執行
-
 
     public Enemy(int x, int y) {
         this.x = x;
@@ -396,8 +409,7 @@ class Enemy {
                 // 不繪製任何東西
                 break;
         }
-    }
-    
+    }    
 
     // 設置豬的狀態
     public void setState(int state) {
@@ -446,6 +458,7 @@ class WoodenBlock {
     double rotationAngle;
     double rotationSpeed;
     boolean isFallingDown; // 用來記錄木板是否向下倒
+    double initialRotationAngle; // 新增變量保存初始角度
 
     public WoodenBlock(int x, int y, int width, int height) {
         this.initialX = x;
@@ -461,34 +474,36 @@ class WoodenBlock {
         this.isStanding = true;
         this.rotationAngle = 0;
         this.rotationSpeed = 0.05; // 降低旋轉速度
+        this.initialRotationAngle = 0; // 默認初始角度為 0
         this.woodImage = new ImageIcon("src/img/wood.png").getImage();
         this.isFallingDown = false;
     }
 
     public void updatePosition() {
         if (!isStanding) {
-            // 更新位置
+            // 更新速度
             vx += ax;
             vy += ay;
             x += vx;
             y += vy;
-
-            // 更新旋轉角度
+    
+            // 根據旋轉方向設置目標角度
             double targetAngle = isFallingDown ? Math.PI / 2 : -Math.PI / 2;
-            if (Math.abs(rotationAngle - targetAngle) > 0.01) {
-                // 使用更平滑的旋轉
-                double angleDistance = targetAngle - rotationAngle;
-                rotationAngle += angleDistance * rotationSpeed;
-            }
-
-            // 地面碰撞檢測
-            if (y > 550) {
+    
+            // 平滑旋轉
+            // double angleDistance = targetAngle - rotationAngle;
+            // if (Math.abs(angleDistance) > 0.01) {
+            //     rotationAngle += angleDistance * rotationSpeed;
+            // }
+            double torque = vx * 0.01; // 模擬扭矩效果，與速度相關
+            rotationAngle += torque;
+    
+            // 防止超出地板
+            if (y != 550) {
                 y = 550;
                 vy = 0;
                 vx = 0;
-                
-                // 當木板停止時，設置為水平狀態
-                rotationAngle = Math.PI / 2; // 保持水平
+                rotationAngle = targetAngle; // 停止旋轉
                 isStanding = true;
             }
         }
@@ -503,16 +518,20 @@ class WoodenBlock {
 
     public void hit(int birdSpeedX, int birdSpeedY, Rectangle birdRect) {
         isStanding = false;
-        // 根據碰撞點決定旋轉方向        
-        isFallingDown = birdRect.getCenterY() > y + height / 2.0;
-
-        // 調整初始速度
-        this.vx = birdSpeedX / 4; // 降低水平速度
-        this.vy = birdSpeedY / 4; // 降低垂直速度
-        
-        // 根據碰撞位置設定初始旋轉角度
-        rotationAngle = 0; // 從垂直狀態開始旋轉
+    
+        // 根據碰撞點決定旋轉方向
+        double hitPoint = birdRect.getCenterY();
+        double blockCenter = y + height / 2.0;
+    
+        isFallingDown = hitPoint > blockCenter;
+    
+        // 根據速度設置初始旋轉速度
+        rotationSpeed = Math.abs(birdSpeedX + birdSpeedY) * 0.005;
+        rotationAngle = 0; // 從無旋轉開始
+        vx = birdSpeedX / 4;
+        vy = birdSpeedY / 4;
     }
+    
 
     public void draw(Graphics g, double scaleX, double scaleY) {
         Graphics2D g2d = (Graphics2D) g;
@@ -539,6 +558,7 @@ class WoodenBlock {
         this.rotationAngle = 0;
         this.vx = 0;
         this.vy = 0;
+        this.rotationAngle = initialRotationAngle; // 恢復初始角度
         this.isFallingDown = false;
     }
 }
