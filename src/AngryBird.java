@@ -4,8 +4,11 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseMotionListener;
 import java.awt.geom.AffineTransform;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sound.sampled.*;
 import javax.swing.*;
 
 
@@ -57,7 +60,45 @@ public class AngryBird {
     public static void setEnemy(Enemy enemy) {
         AngryBird.enemy = enemy;
     }
-    // WoodBlock[] woodBlocks = null;
+
+    public static class MusicPlayer {
+        private Clip clip;
+        
+        public void play(String filePath) {
+            try {
+                File musicFile = new File(filePath);
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(musicFile);
+                clip = AudioSystem.getClip();
+                clip.open(audioStream);
+                clip.start();
+            } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) {
+                e.printStackTrace();
+            }
+        }
+        
+        public void stop() {
+            if (clip != null) {
+                clip.stop();
+                clip.close();
+            }
+        }
+        
+        public void pause() {
+            if (clip != null) {
+                clip.stop();
+            }
+        }
+        
+        public void resume() {
+            if (clip != null) {
+                clip.start();
+            }
+        }
+    
+        public static void main(String[] args) {
+            
+        }
+    }
 
     static int lastBallX, lastBallY; // 上一幀小鳥的位置
     static int birdSpeedX, birdSpeedY; // 小鳥的速度
@@ -77,11 +118,15 @@ public class AngryBird {
         boolean dragging = false;
         List<Point> trajectory = new ArrayList<>(); //預測路徑
 
+        AngryBird.MusicPlayer flySound = new AngryBird.MusicPlayer();        
+        MusicPlayer drag = new MusicPlayer();
+
         {
             // 滑鼠事件
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
+                    drag.play("src/music/slingshot streched.wav");
                     // 判斷是否點擊在小鳥內部
                     if (e.getX() >= ballX && e.getX() <= ballX + 32 &&
                         e.getY() >= ballY && e.getY() <= ballY + 32) {
@@ -94,7 +139,15 @@ public class AngryBird {
 
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    if (dragging) {
+                    if (dragging) {      
+                        if (birdType == 1){
+                            flySound .play("src/music/redbird_yell01.wav");
+                        } else if (birdType == 2){
+                            flySound .play("src/music/bird 02 flying.wav");
+                        } else if (birdType == 3){
+                            flySound .play("src/music/bird 05 flying.wav");
+                        }               
+                        
                         dragging = false;
 
                         // 計算釋放時水平方向與垂直方向的速度，放大水平方向速度
@@ -119,16 +172,21 @@ public class AngryBird {
                 }
 
                 @Override
-                public void mouseClicked(MouseEvent e) {
+                public void mouseClicked(MouseEvent e) {       
+                    drag.stop();             
                     if (birdType == 2 && !blueBirdSplit) {
                         blueBirdSplit = true;
                         hideOriginalBlueBird = true;
                         System.out.println("藍色鳥分裂!");
+                        flySound.stop();
 
                         // 分裂成三個小鳥
                         splitBirds.add(new SplitBlueBird(ballX, ballY, vx * 0.8f, vy * 1.1f));
                         splitBirds.add(new SplitBlueBird(ballX, ballY, vx * 1.2f, vy * 0.9f));
                         splitBirds.add(new SplitBlueBird(ballX, ballY, vx, vy));
+                        
+                        AngryBird.MusicPlayer blueSound = new AngryBird.MusicPlayer();
+                        blueSound.play("src/music/bird next military a1.wav");
                     }
 
                     if (birdType == 3) {
@@ -143,7 +201,7 @@ public class AngryBird {
             addMouseMotionListener((MouseMotionListener) new MouseMotionAdapter() {
                 @Override
                 public void mouseDragged(MouseEvent e) {
-                    if (dragging) {
+                    if (dragging) {                        
                         ballX = Math.max(0, Math.min(e.getX() - offsetX, getWidth() - 32));
                         ballY = Math.max(0, Math.min(e.getY() - offsetY, getHeight() - 32));
 
@@ -197,6 +255,7 @@ public class AngryBird {
                     // 傳遞鳥的速度和矩形，處理碰撞
                     block.hit(birdSpeedX, birdSpeedY, birdRect); 
                     System.out.println("木板被擊倒！");
+                    flySound.stop();
                 }
             }
 
@@ -226,6 +285,8 @@ public class AngryBird {
                 enemy.vx = birdSpeedX / 2;
                 enemy.vy = birdSpeedY / 2;
                 enemy.setState(1); // 切換為煙霧狀態
+                AngryBird.MusicPlayer pigSound = new AngryBird.MusicPlayer();
+                pigSound .play("src/music/piglette collision a1.wav");
                 enemy.updateState(); // 啟動煙霧倒計時
                 pne.repaint();
             }
@@ -288,6 +349,9 @@ public class AngryBird {
         pne.add(btnBird);
 
         initWoodBlocks();
+
+        MusicPlayer player = new MusicPlayer();
+        player.play("src/music/Angry Birds Theme.wav");  // 替換為您的音樂文件路徑
 
         // 重置按鈕功能
         
@@ -459,6 +523,7 @@ class WoodenBlock {
     double rotationSpeed;
     boolean isFallingDown; // 用來記錄木板是否向下倒
     double initialRotationAngle; // 新增變量保存初始角度
+    private boolean hasCollided = false; // 新增變數追蹤是否已發生碰撞
 
     public WoodenBlock(int x, int y, int width, int height) {
         this.initialX = x;
@@ -510,15 +575,18 @@ class WoodenBlock {
     }
 
     public boolean checkCollision(Rectangle birdRect) {
-        if (!isStanding) return false; // 如果木板已經倒下，不再檢測碰撞
+        if (hasCollided || !isStanding) return false; // 如果已碰撞或已倒下，不再檢測
         
         Rectangle blockRect = new Rectangle(x, y, width, height);
         return blockRect.intersects(birdRect);
     }
 
     public void hit(int birdSpeedX, int birdSpeedY, Rectangle birdRect) {
+        if (hasCollided) return;
+        hasCollided = true;
         isStanding = false;
-    
+        AngryBird.MusicPlayer hitSound = new AngryBird.MusicPlayer();
+        hitSound .play("src/music/wood collision a1.wav");
         // 根據碰撞點決定旋轉方向
         double hitPoint = birdRect.getCenterY();
         double blockCenter = y + height / 2.0;
@@ -556,6 +624,7 @@ class WoodenBlock {
         this.x = initialX;
         this.y = initialY;
         this.rotationAngle = 0;
+        hasCollided = false;
         this.vx = 0;
         this.vy = 0;
         this.rotationAngle = initialRotationAngle; // 恢復初始角度
