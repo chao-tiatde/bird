@@ -2,6 +2,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import javax.swing.*;
 
@@ -53,6 +54,7 @@ public class AngryBird {
                         dragging = true;
                         offsetX = e.getX() - scaledBallX;
                         offsetY = e.getY() - scaledBallY;
+                        
                     }
                 }
 
@@ -96,15 +98,22 @@ public class AngryBird {
             
         // 檢測小鳥與木板和敵人是否碰撞
         private void checkCollision() {
+            // 創建鳥的矩形，假設鳥的大小是 32x32
             Rectangle birdRect = new Rectangle(ballX, ballY, 32, 32);
+            
+            // 檢查每個木板
             for (WoodenBlock block : woodenBlocks) {
                 if (block.checkCollision(birdRect)) {
-                    block.hit(birdSpeedX, birdSpeedY); // 傳遞鳥的速度
+                    // 傳遞鳥的速度和矩形，處理碰撞
+                    block.hit(birdSpeedX, birdSpeedY, birdRect); 
                     System.out.println("木板被擊倒！");
                 }
-            }            
+            }
+        
+            // 可能還有其他碰撞檢查
             checkCollisionBird();
         }
+        
 
         // 敵人被小鳥擊中
         
@@ -325,83 +334,114 @@ class pig extends Enemy{
 }
 
 class WoodenBlock {
-    int x, y; // 木板的位置
-    int vx, vy; // 水平和垂直速度
-    int ax, ay; // 水平和垂直加速度
-    int width, height; // 木板的寬度和高度
-    int initialX, initialY; // 木板的初始位置
-    boolean isStanding; // 木板是否還在立著
+    int x, y;
+    int vx, vy;
+    int ax, ay;
+    int width, height;
+    int initialX, initialY;
+    boolean isStanding;
     Image woodImage;
+    double rotationAngle;
+    double rotationSpeed;
+    boolean isFallingDown; // 用來記錄木板是否向下倒
 
     public WoodenBlock(int x, int y, int width, int height) {
-        this.initialX = x; // 保存初始位置
+        this.initialX = x;
         this.initialY = y;
         this.x = x;
         this.y = y;
         this.vx = 0;
         this.vy = 0;
         this.ax = 0;
-        this.ay = 10; // 模擬重力
+        this.ay = 10;
         this.width = width;
         this.height = height;
-        this.isStanding = true; // 初始狀態為立著
+        this.isStanding = true;
+        this.rotationAngle = 0;
+        this.rotationSpeed = 0.1; // 降低旋轉速度
         this.woodImage = new ImageIcon("src/img/wood.png").getImage();
+        this.isFallingDown = false;
     }
 
     public void updatePosition() {
-        // 只有在木板倒下後才進行運動模擬
         if (!isStanding) {
-            vx += ax; // 更新水平速度（加速度為0時，速度保持恆定）
-            vy += ay; // 更新垂直速度（受到重力加速度影響）
-            x += vx; // 更新水平位置
-            y += vy; // 更新垂直位置
+            // 更新位置
+            vx += ax;
+            vy += ay;
+            x += vx;
+            y += vy;
 
-            // 防止超出地板（假設地板y=1200）
-            if (y > 1160) {
-                y = 1160;
-                vy = 0; // 停止垂直運動
-                vx = 0; // 停止水平運動
+            // 更新旋轉角度
+            double targetAngle = isFallingDown ? Math.PI / 2 : -Math.PI / 2;
+            if (Math.abs(rotationAngle - targetAngle) > 0.01) {
+                // 使用更平滑的旋轉
+                double angleDistance = targetAngle - rotationAngle;
+                rotationAngle += angleDistance * rotationSpeed;
+            }
+
+            // 地面碰撞檢測
+            if (y > 1110) {
+                y = 1110;
+                vy = 0;
+                vx = 0;
+                
+                // 當木板停止時，設置為水平狀態
+                rotationAngle = Math.PI / 2; // 保持水平
+                isStanding = true;
             }
         }
     }
 
-    // 碰撞檢測
     public boolean checkCollision(Rectangle birdRect) {
+        if (!isStanding) return false; // 如果木板已經倒下，不再檢測碰撞
+        
         Rectangle blockRect = new Rectangle(x, y, width, height);
-        return isStanding && blockRect.intersects(birdRect);
+        return blockRect.intersects(birdRect);
     }
 
-    // 處理碰撞後的狀態
-    public void hit(int birdSpeedX, int birdSpeedY) {
+    public void hit(int birdSpeedX, int birdSpeedY, Rectangle birdRect) {
         isStanding = false;
-        this.vx = birdSpeedX / 2; // 根據鳥的速度給木板初速度
-        this.vy = birdSpeedY / 2;
+        // 根據碰撞點決定旋轉方向
+        double hitPoint = birdRect.getCenterY();
+        double blockCenter = y + height / 2.0;
+        
+        isFallingDown = hitPoint > blockCenter;
+        
+        // 調整初始速度
+        this.vx = birdSpeedX / 4; // 降低水平速度
+        this.vy = birdSpeedY / 4; // 降低垂直速度
+        
+        // 根據碰撞位置設定初始旋轉角度
+        rotationAngle = 0; // 從垂直狀態開始旋轉
     }
-    
 
-    // 繪製木板
     public void draw(Graphics g, double scaleX, double scaleY) {
         Graphics2D g2d = (Graphics2D) g;
         int scaledX = (int) (x * scaleX);
         int scaledY = (int) (y * scaleY);
-    
-        if (isStanding) {
-            g.drawImage(woodImage, scaledX, scaledY, width, height, null);
-        } else {
-            // 根據速度計算旋轉角度
-            double rotationAngle = Math.atan2(vy, vx); 
-            g2d.rotate(rotationAngle, scaledX + width / 2.0, scaledY + height / 2.0);
-            g.drawImage(woodImage, scaledX, scaledY, width, height, null);
-            g2d.rotate(-rotationAngle, scaledX + width / 2.0, scaledY + height / 2.0);
-        }
-    }
-    
 
-    // 重置木板的狀態
+        // 保存當前變換
+        AffineTransform oldTransform = g2d.getTransform();
+
+        // 設置旋轉中心點
+        double centerX = scaledX + width / 2.0;
+        double centerY = scaledY + height / 2.0;
+        
+        // 應用旋轉
+        g2d.rotate(rotationAngle, centerX, centerY);
+        g.drawImage(woodImage, scaledX, scaledY, width, height, null);
+        
+        // 恢復原來的變換
+        g2d.setTransform(oldTransform);
+    }
+
     public void reset() {
-        this.isStanding = true; // 重置為立著
+        this.isStanding = true;
         this.x = initialX;
         this.y = initialY;
-    }    
+        this.rotationAngle = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.isFallingDown = false;
+    }
 }
-
