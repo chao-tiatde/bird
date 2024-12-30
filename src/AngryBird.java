@@ -4,63 +4,78 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
+import java.util.List;
 import javax.swing.*;
-
 
 
 public class AngryBird {
     static JFrame frm = new JFrame("憤怒鳥");
-    static int ballX = 120, ballY = 1160; // 小鳥的初始位置
-    static int enemyX = 1800, enemyY = 1160; // 敵人的初始位置
-    static int woodX = 1700, woodY = 1058, woodW = 30, woodH = 80;
+    static int ballX = 120, ballY = 550; // 小鳥的初始位置
+    static int enemyX = 1000, enemyY = 565; // 敵人的初始位置
+    static int woodX = 900, woodY = 550, woodW = 30, woodH = 80;
     static Enemy enemy = new Enemy(enemyX, enemyY); // 初始化敵人
     static WoodenBlock wood = new WoodenBlock(woodX, woodY, woodW, woodH);
     static ArrayList<WoodenBlock> woodenBlocks = new ArrayList<>(); // 木板列表
+
+    public static Enemy getEnemy() {
+        return enemy;
+    }
+
+    public static void setEnemy(Enemy enemy) {
+        AngryBird.enemy = enemy;
+    }
     WoodBlock[] woodBlocks = null;
 
     static int lastBallX, lastBallY; // 上一幀小鳥的位置
     static int birdSpeedX, birdSpeedY; // 小鳥的速度
 
-    public static final double GRAVITY = 9.8; // 單位 m/s^2
+    static float vx = 0, vy = 0; // 水平與垂直速度
+    static Timer timer; // 計時器
 
-    private static long timerClick;
-    private final Graphics graphics = null; //画笔
-    // private final Bullet bullet;
-    private static int t ;
-    private static int v0;
-    private static int vt;
-    private static int g;
-    private static  boolean isTimerRunning = false;
+    public static final double GRAVITY = 9.8; // 單位 m/s^2
 
     static JPanel pne = new JPanel() {
         Image bgImage = new ImageIcon("src/img/BG.jpg").getImage();
         Image ballImage = new ImageIcon("src/img/RedBird.png").getImage();
+        Image shotImage = new ImageIcon("src/img/SlingShot.png").getImage();
         int offsetX, offsetY; // 滑鼠拖曳偏移量
         boolean dragging = false;
+        List<Point> trajectory = new ArrayList<>(); //預測路徑
 
         {
             // 滑鼠事件
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    double scaleX = (double) getWidth() / 2560;
-                    double scaleY = (double) getHeight() / 1440;
-                    int scaledBallX = (int) (ballX * scaleX);
-                    int scaledBallY = (int) (ballY * scaleY);
-
                     // 判斷是否點擊在小鳥內部
-                    if (e.getX() >= scaledBallX && e.getX() <= scaledBallX + 32 &&
-                        e.getY() >= scaledBallY && e.getY() <= scaledBallY + 32) {
+                    if (e.getX() >= ballX && e.getX() <= ballX + 32 &&
+                        e.getY() >= ballY && e.getY() <= ballY + 32) {
                         dragging = true;
-                        offsetX = e.getX() - scaledBallX;
-                        offsetY = e.getY() - scaledBallY;
-                        
+                        offsetX = e.getX() - ballX;
+                        offsetY = e.getY() - ballY;
+                        if (timer != null) timer.stop();
                     }
                 }
 
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    dragging = false;
+                    if (dragging) {
+                        dragging = false;
+
+                        // 計算釋放時水平方向與垂直方向的速度，放大水平方向速度
+                        vx = (float) (e.getX() - offsetX - 120) ;  // 增大速度計算的放大倍數
+                        vy = (float) (e.getY() - offsetY - 550) ;  // 放大垂直方向速度
+
+                        // 記錄速度計算的日誌
+                        System.out.println("Calculated vx: " + vx + ", vy: " + vy);
+                        System.out.println("Calculated e.getX(): " + e.getX() + ", offsetX: " + offsetX+ "ballX " + ballX);
+                        // 在放開滑鼠後開始計時器
+                        timer = new Timer(16, evt -> moveBall());
+                        timer.start();
+
+                        // 清除預測路徑
+                        trajectory.clear();
+                    }
                 }
             });
 
@@ -68,17 +83,32 @@ public class AngryBird {
                 @Override
                 public void mouseDragged(MouseEvent e) {
                     if (dragging) {
-                        double scaleX = (double) getWidth() / 2560;
-                        double scaleY = (double) getHeight() / 1440;
+                        ballX = Math.max(0, Math.min(e.getX() - offsetX, getWidth() - 32));
+                        ballY = Math.max(0, Math.min(e.getY() - offsetY, getHeight() - 32));
 
-                        ballX = (int) ((e.getX() - offsetX) / scaleX);
-                        ballY = (int) ((e.getY() - offsetY) / scaleY);
+                        // 計算當前速度
+                        float tempVx = (float) (ballX - 120);
+                        float tempVy = (float) (ballY - 550);
 
-                        // 防止小鳥移出視窗邊界
-                        ballX = Math.max(0, Math.min(ballX, 2560 - 32));
-                        ballY = Math.max(0, Math.min(ballY, 1200 - 32));
+                        // 清空路徑
+                        trajectory.clear();
 
-                         // 更新速度
+                        // 預測未來路徑
+                        float posX = ballX, posY = ballY;
+                        for (int i = 0; i < 100; i++) { // 計算 100 個點
+                            posX -= tempVx;
+                            posY -= tempVy;
+                            tempVx *= 0.94; // 模擬摩擦
+                            tempVy *= 0.9;
+                            tempVy += -1; // 重力影響
+
+                            // 超出邊界停止
+                            if (posY >= getHeight() - 130) break;
+
+                            trajectory.add(new Point((int) posX, (int) posY));
+                        }
+
+                        // 更新速度
                         birdSpeedX = ballX - lastBallX;
                         birdSpeedY = ballY - lastBallY;
 
@@ -116,8 +146,6 @@ public class AngryBird {
         
 
         // 敵人被小鳥擊中
-        
-
         private void checkCollisionBird() {
             Rectangle birdRect = new Rectangle(ballX, ballY, 32, 32);
             Rectangle enemyRect = new Rectangle(enemy.x, enemy.y, 32, 32);
@@ -132,49 +160,19 @@ public class AngryBird {
                 pne.repaint();
             }
         }
-     
-        
-        
-            // timer.schedule(new TimerTask() {
-            //     @Override
-            //     public void run() {
-
-            //         while (true) {
-            //             timerClick++;
-                
-            //             // 更新敵人位置
-            //             enemy.updatePosition();
-                
-            //             // 更新所有木板位置
-            //             for (WoodenBlock block : woodenBlocks) {
-            //                 block.updatePosition();
-            //             }
-
-            //             // enemy.setState(2); // 煙霧顯示一段時間後，切換為消失
-
-            //             // 重繪畫面
-            //             pne.repaint();
-                
-            //             try {
-            //                 Thread.sleep(10);
-            //             } catch (InterruptedException e) {
-            //                 throw new RuntimeException(e);
-            //             }
-            //         }
-
-            //         //恭喜你找到了彩蛋!!!
-            //     }
-            // }, 150); // 150毫秒後切換狀態
-
-
 
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
-
-            double scaleX = (double) getWidth() / 2560;
-            double scaleY = (double) getHeight() / 1440;
+            g.drawImage(shotImage, 100, 490, 100, 150, this);
+            
+            g.setColor(Color.ORANGE);
+            for (int i = 0; i < trajectory.size() - 1; i++) {
+                Point p1 = trajectory.get(i);
+                Point p2 = trajectory.get(i + 1);
+                g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            }
 
             // 更新敵人和木板的位置
             enemy.updatePosition();
@@ -183,27 +181,30 @@ public class AngryBird {
             }
 
             // 繪製敵人（豬）
-            enemy.draw(g, scaleX, scaleY);
+            enemy.draw(g, enemy.x, enemy.y);
             
             // wood.draw(g, scaleX, scaleY);
             // 繪製所有木板
             for (WoodenBlock block : woodenBlocks) {
-                block.draw(g, scaleX, scaleY);
+                block.draw(g, wood.x, wood.y);
             }
 
             // 繪製小鳥
-            int scaledBallX = (int) (ballX * scaleX);
-            int scaledBallY = (int) (ballY * scaleY);
+            int scaledBallX = (int) (ballX );
+            int scaledBallY = (int) (ballY );
             g.drawImage(ballImage, scaledBallX, scaledBallY, 32, 32, this);
         }
     };
 
     static JButton btn = new JButton("重置");
+    static JButton btnBird = new JButton("切換憤怒鳥");
 
     public static void main(String[] args) {
         pne.setLayout(null);
         btn.setBounds(10, 10, 80, 30); // 按鈕位置
+        btnBird.setBounds(100, 10, 100, 30);
         pne.add(btn);
+        pne.add(btnBird);
 
         initWoodBlocks();
 
@@ -211,23 +212,45 @@ public class AngryBird {
         
         btn.addActionListener(_ -> {
             ballX = 120;
-            ballY = 1160;
+            ballY = 550;
             enemy.reset(); // 重置敵人
             for (WoodenBlock block : woodenBlocks) {
                 block.reset(); // 重置所有木板
             }
+            vx = 0;
+            vy = 0;
+            if (timer != null) timer.stop();
             pne.repaint();
         });
 
         frm.add(pne);
-        frm.setSize(800, 600);
+        frm.setSize(1500, 750);
         frm.setVisible(true);
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
+    static void moveBall() {
+        // 更新小鳥的位置
+        ballX -= vx;
+        ballY -= vy;
+    
+        // 減少水平方向和垂直方向的摩擦力，並控制重力影響
+        vx *= 0.94;  // 減小摩擦，讓小鳥有更長的運動時間
+        vy *= 0.9;  // 減小摩擦力
+        vy += -1;     // 增加重力影響，調整重力使其更自然
+
+        if (ballY >= pne.getHeight() - 130) {
+            ballY = pne.getHeight() - 130; // 修正小鳥位置
+            vy = 0; // 停止垂直速度
+        }
+    
+        // 重新繪製界面
+        pne.repaint();
+    }
+
     public static void initWoodBlocks() {
-        woodenBlocks.add(new WoodenBlock(1700, 1058, 30, 80));
-        woodenBlocks.add(new WoodenBlock(1900, 1058, 30, 80));
+        woodenBlocks.add(new WoodenBlock(950, 530, 30, 80));
+        woodenBlocks.add(new WoodenBlock(1050, 530, 30, 80));
     }
 }
 
@@ -262,7 +285,7 @@ class Enemy {
     // 如果敵人狀態是煙霧且計時器尚未運行
     if (state == 1) {
        
-        Timer timer = new Timer(150, e -> { // 設定150毫秒後觸發
+        Timer timer = new Timer(120, e -> { // 設定150毫秒後觸發
             state = 2; // 切換到消失狀態
           
             System.out.println("敵人變成消失狀態！");
@@ -274,15 +297,13 @@ class Enemy {
 
     // 繪製敵人
     public void draw(Graphics g, double scaleX, double scaleY) {
-        int scaledX = (int) (x * scaleX);
-        int scaledY = (int) (y * scaleY);
     
         switch (state) {
             case 0:  // 正常狀態
-                g.drawImage(enemyImage, scaledX, scaledY, 32, 32, null);
+                g.drawImage(enemyImage, x, y, 32, 32, null);
                 break;
             case 1:  // 煙霧狀態
-                g.drawImage(smokeImage, scaledX, scaledY, 32, 32, null);
+                g.drawImage(smokeImage, x, y, 32, 32, null);
                 break;
             case 2:  // 消失狀態
                 // 不繪製任何東西
@@ -302,8 +323,8 @@ class Enemy {
             smokeTimer.stop();  // 停止正在執行的計時器
         }
         state = 0;
-        x = 1800;
-        y = 1160;
+        x = 1000;
+        y = 565;
         vx = 0;
         vy = 0;
         ax = 0;
@@ -318,9 +339,9 @@ class Enemy {
         x += vx; // 更新水平位置
         y += vy; // 更新垂直位置
     
-        // 防止超出地板（假設地板y=1160）
-        if (y > 1160) {
-            y = 1160;
+        // 防止超出地板（假設地板y=550）
+        if (y > 570) {
+            y = 570;
             vy = 0; // 停止垂直運動
             vx = 0; // 停止水平運動
         }
@@ -380,8 +401,8 @@ class WoodenBlock {
             }
 
             // 地面碰撞檢測
-            if (y > 1110) {
-                y = 1110;
+            if (y > 550) {
+                y = 550;
                 vy = 0;
                 vx = 0;
                 
@@ -417,19 +438,19 @@ class WoodenBlock {
 
     public void draw(Graphics g, double scaleX, double scaleY) {
         Graphics2D g2d = (Graphics2D) g;
-        int scaledX = (int) (x * scaleX);
-        int scaledY = (int) (y * scaleY);
+        // int scaledX = (int) (x * scaleX);
+        // int scaledY = (int) (y * scaleY);
 
         // 保存當前變換
         AffineTransform oldTransform = g2d.getTransform();
 
         // 設置旋轉中心點
-        double centerX = scaledX + width / 2.0;
-        double centerY = scaledY + height / 2.0;
+        double centerX = x + width / 2.0;
+        double centerY = y + height / 2.0;
         
         // 應用旋轉
         g2d.rotate(rotationAngle, centerX, centerY);
-        g.drawImage(woodImage, scaledX, scaledY, width, height, null);
+        g.drawImage(woodImage, x, y, width, height, null);
         
         // 恢復原來的變換
         g2d.setTransform(oldTransform);
