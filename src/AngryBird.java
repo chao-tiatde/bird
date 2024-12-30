@@ -2,6 +2,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseMotionListener;
 import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,38 @@ public class AngryBird {
     static WoodenBlock wood = new WoodenBlock(woodX, woodY, woodW, woodH);
     static ArrayList<WoodenBlock> woodenBlocks = new ArrayList<>(); // 木板列表
 
+    static int birdType = 1; // 1: 紅鳥, 2: 藍鳥, 3: 黃鳥
+    static boolean blueBirdSplit = false; // 藍色鳥是否已分裂
+    static boolean hideOriginalBlueBird = false; // 是否隱藏原始藍色鳥
+
+    static class SplitBlueBird {
+        int x, y;
+        float vx, vy;
+
+        SplitBlueBird(int x, int y, float vx, float vy) {
+            this.x = x;
+            this.y = y;
+            this.vx = vx;
+            this.vy = vy;
+        }
+
+        void update() {
+            x -= vx;
+            y -= vy;
+            vx *= 0.94;
+            vy *= 0.9;
+            vy += -1; // 重力加速度
+
+            // 確保鳥到達地面後停止墜落
+            if (y >= pne.getHeight() - 123) {
+                y = pne.getHeight() - 123;  // 限制到地面
+                vy = 0;  // 停止垂直速度，防止再墜落
+            }
+        }
+    }
+
+    static List<SplitBlueBird> splitBirds = new ArrayList<>();
+
     public static Enemy getEnemy() {
         return enemy;
     }
@@ -24,7 +57,7 @@ public class AngryBird {
     public static void setEnemy(Enemy enemy) {
         AngryBird.enemy = enemy;
     }
-    WoodBlock[] woodBlocks = null;
+    // WoodBlock[] woodBlocks = null;
 
     static int lastBallX, lastBallY; // 上一幀小鳥的位置
     static int birdSpeedX, birdSpeedY; // 小鳥的速度
@@ -36,7 +69,9 @@ public class AngryBird {
 
     static JPanel pne = new JPanel() {
         Image bgImage = new ImageIcon("src/img/BG.jpg").getImage();
-        Image ballImage = new ImageIcon("src/img/RedBird.png").getImage();
+        Image redBirdImage = new ImageIcon("src/img/RedBird.png").getImage();
+        Image blueBirdImage = new ImageIcon("src/img/BlueBird.png").getImage();
+        Image yellowBirdImage = new ImageIcon("src/img/YellowBird.png").getImage();
         Image shotImage = new ImageIcon("src/img/SlingShot.png").getImage();
         int offsetX, offsetY; // 滑鼠拖曳偏移量
         boolean dragging = false;
@@ -70,16 +105,42 @@ public class AngryBird {
                         System.out.println("Calculated vx: " + vx + ", vy: " + vy);
                         System.out.println("Calculated e.getX(): " + e.getX() + ", offsetX: " + offsetX+ "ballX " + ballX);
                         // 在放開滑鼠後開始計時器
-                        timer = new Timer(16, evt -> moveBall());
+                        timer = new Timer(10, evt -> {
+                            moveBall();
+                            checkCollision(); // 在每次更新小鳥位置後立即檢測碰撞
+                        });
+                        
                         timer.start();
 
                         // 清除預測路徑
                         trajectory.clear();
+                        blueBirdSplit = false; // 重置藍色鳥的分裂狀態
                     }
                 }
+
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (birdType == 2 && !blueBirdSplit) {
+                        blueBirdSplit = true;
+                        hideOriginalBlueBird = true;
+                        System.out.println("藍色鳥分裂!");
+
+                        // 分裂成三個小鳥
+                        splitBirds.add(new SplitBlueBird(ballX, ballY, vx * 0.8f, vy * 1.1f));
+                        splitBirds.add(new SplitBlueBird(ballX, ballY, vx * 1.2f, vy * 0.9f));
+                        splitBirds.add(new SplitBlueBird(ballX, ballY, vx, vy));
+                    }
+
+                    if (birdType == 3) {
+                        vx -= 20; // 可以根據需求調整這個增量值
+                        System.out.println("黃色鳥的水平速度增加: " + vx);
+                    }
+                }
+
+                
             });
 
-            addMouseMotionListener(new MouseMotionAdapter() {
+            addMouseMotionListener((MouseMotionListener) new MouseMotionAdapter() {
                 @Override
                 public void mouseDragged(MouseEvent e) {
                     if (dragging) {
@@ -104,13 +165,12 @@ public class AngryBird {
 
                             // 超出邊界停止
                             if (posY >= getHeight() - 130) break;
-
                             trajectory.add(new Point((int) posX, (int) posY));
                         }
 
                         // 更新速度
-                        birdSpeedX = ballX - lastBallX;
-                        birdSpeedY = ballY - lastBallY;
+                        birdSpeedX = (int) vx; // 記錄水平速度
+                        birdSpeedY = (int) vy; // 記錄垂直速度
 
                         // 記錄上一次位置
                         lastBallX = ballX;
@@ -166,7 +226,7 @@ public class AngryBird {
             super.paintComponent(g);
             g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
             g.drawImage(shotImage, 100, 490, 100, 150, this);
-            
+
             g.setColor(Color.ORANGE);
             for (int i = 0; i < trajectory.size() - 1; i++) {
                 Point p1 = trajectory.get(i);
@@ -180,19 +240,30 @@ public class AngryBird {
                 block.updatePosition();
             }
 
-            // 繪製敵人（豬）
-            enemy.draw(g, enemy.x, enemy.y);
-            
-            // wood.draw(g, scaleX, scaleY);
             // 繪製所有木板
             for (WoodenBlock block : woodenBlocks) {
                 block.draw(g, wood.x, wood.y);
             }
 
-            // 繪製小鳥
-            int scaledBallX = (int) (ballX );
-            int scaledBallY = (int) (ballY );
-            g.drawImage(ballImage, scaledBallX, scaledBallY, 32, 32, this);
+            // 繪製敵人（豬）
+            enemy.draw(g, enemy.x, enemy.y);
+
+            if (birdType == 1) {
+                g.drawImage(redBirdImage, ballX, ballY, 32, 32, this);
+            } else if (birdType == 2) {
+                if (!hideOriginalBlueBird) {
+                    g.drawImage(blueBirdImage, ballX, ballY, 32, 32, this);
+                }
+
+                // 繪製分裂後的藍色鳥
+                for (SplitBlueBird bird : splitBirds) {
+                    bird.update();  // 更新鳥的位置
+                    g.drawImage(blueBirdImage, bird.x, bird.y, 25, 25, this); // 繪製藍色小鳥
+                }
+            } else if (birdType == 3) {
+                // 繪製黃色鳥
+                g.drawImage(yellowBirdImage, ballX - 35, ballY - 15, 110, 64, this);
+            }
         }
     };
 
@@ -219,12 +290,28 @@ public class AngryBird {
             }
             vx = 0;
             vy = 0;
+            hideOriginalBlueBird = false;
+            splitBirds.clear();  // 清空分裂鳥列表
             if (timer != null) timer.stop();
+            pne.repaint();
+        });
+
+        btnBird.addActionListener(e -> {
+            birdType = (birdType % 3) + 1; // 在三種鳥之間切換
+            ballX = 120;
+            ballY = 550;
+            vx = 0;
+            vy = 0;
+            hideOriginalBlueBird = false;
+            splitBirds.clear();  // 清空分裂鳥列表
+            if (timer != null) timer.stop();
+            System.out.println("切換到" + (birdType == 1 ? "紅色鳥" : birdType == 2 ? "藍色鳥" : "黃色鳥"));
             pne.repaint();
         });
 
         frm.add(pne);
         frm.setSize(1500, 750);
+        frm.setResizable(false);
         frm.setVisible(true);
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
@@ -284,8 +371,8 @@ class Enemy {
    public void updateState() {
     // 如果敵人狀態是煙霧且計時器尚未運行
     if (state == 1) {
-       
-        Timer timer = new Timer(120, e -> { // 設定150毫秒後觸發
+        isTimerRunning = true; // 防止多次運行
+        Timer timer = new Timer(100, e -> { // 設定150毫秒後觸發
             state = 2; // 切換到消失狀態
           
             System.out.println("敵人變成消失狀態！");
@@ -339,18 +426,12 @@ class Enemy {
         x += vx; // 更新水平位置
         y += vy; // 更新垂直位置
     
-        // 防止超出地板（假設地板y=550）
+        // 防止超出地板（假設地板y=570）
         if (y > 570) {
             y = 570;
             vy = 0; // 停止垂直運動
             vx = 0; // 停止水平運動
         }
-    }
-}
-
-class pig extends Enemy{
-    public pig (int x, int y){
-        super(x, y);
     }
 }
 
@@ -379,7 +460,7 @@ class WoodenBlock {
         this.height = height;
         this.isStanding = true;
         this.rotationAngle = 0;
-        this.rotationSpeed = 0.1; // 降低旋轉速度
+        this.rotationSpeed = 0.05; // 降低旋轉速度
         this.woodImage = new ImageIcon("src/img/wood.png").getImage();
         this.isFallingDown = false;
     }
@@ -422,12 +503,9 @@ class WoodenBlock {
 
     public void hit(int birdSpeedX, int birdSpeedY, Rectangle birdRect) {
         isStanding = false;
-        // 根據碰撞點決定旋轉方向
-        double hitPoint = birdRect.getCenterY();
-        double blockCenter = y + height / 2.0;
-        
-        isFallingDown = hitPoint > blockCenter;
-        
+        // 根據碰撞點決定旋轉方向        
+        isFallingDown = birdRect.getCenterY() > y + height / 2.0;
+
         // 調整初始速度
         this.vx = birdSpeedX / 4; // 降低水平速度
         this.vy = birdSpeedY / 4; // 降低垂直速度
@@ -438,8 +516,6 @@ class WoodenBlock {
 
     public void draw(Graphics g, double scaleX, double scaleY) {
         Graphics2D g2d = (Graphics2D) g;
-        // int scaledX = (int) (x * scaleX);
-        // int scaledY = (int) (y * scaleY);
 
         // 保存當前變換
         AffineTransform oldTransform = g2d.getTransform();
