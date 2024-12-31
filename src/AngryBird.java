@@ -649,3 +649,40 @@ class WoodenBlock {
         this.hasCollided = false; // 重置碰撞狀態
     }
 }
+
+// class Ground {
+//     // int x = 0, y = AngryBird.pne.getHeight() - 130;
+//     // int width = AngryBird.pne.getWidth(), height = 300;
+//     // int initialX, initialY;
+//     Rectangle groundRect;
+//     boolean reverse = false;
+
+//     public Ground(int x, int y, int w, int h) {
+//         groundRect = new Rectangle(x, y, w, h);
+//     }
+
+//     public boolean check(Rectangle birdRect) {
+        
+//         //鳥鳥有沒有碰到地板
+//         if (groundRect.intersects(birdRect)) {
+//             if (Math.abs(AngryBird.vy) < 4){
+//                 AngryBird.vy = 0; //y軸速度太小就不彈跳了
+//             } else{
+//                 //速度夠就反彈
+//                 AngryBird.ballY = (groundRect.y -32);
+//                 AngryBird.vy += AngryBird.vy * -1.2;
+//             }
+
+//             //撞到地板x軸速度也要減弱一點
+//             if (AngryBird.vx < 0) {
+//                 if(Math.abs(AngryBird.vx) < 2) AngryBird.vx = 0;
+//                 else AngryBird.vx += 1;
+//             } else if (AngryBird.vx > 0) {
+//                 if(Math.abs(AngryBird.vx) < 2) AngryBird.vx = 0;
+//                 else AngryBird.vx += -1;
+//             }
+//         }
+//         return groundRect.intersects(birdRect);
+//     }
+    
+// }
