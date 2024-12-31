@@ -155,7 +155,7 @@ public class AngryBird {
                         System.out.println("Calculated vx: " + vx + ", vy: " + vy);
                         System.out.println("Calculated e.getX(): " + e.getX() + ", offsetX: " + offsetX+ "ballX " + ballX);
                         // 在放開滑鼠後開始計時器
-                        timer = new Timer(1, _ -> {
+                        timer = new Timer(10, _ -> {
                             moveBall();
                             checkCollision(); // 在每次更新小鳥位置後立即檢測碰撞
                         });
@@ -398,19 +398,23 @@ public class AngryBird {
             ballX -= vx;
             ballY -= vy;      
             
-        if (ballY >= pne.getHeight() - 130) {
-            ballY = pne.getHeight() - 130; // 修正小鳥位置
-            vy = 0; // 停止垂直速度
-            if (vx < 0) {
-                vx += 0.7;    
-            } else if (vx > 0) {
-                vx = 0;
+            if (ballY >= pne.getHeight() - 130) {
+                ballY = pne.getHeight() - 130; // 修正小鳥位置
+                vy = 0; // 停止垂直速度
+                if (vx < 0) {
+                    vx += 0.7;    
+                } else if (vx > 0) {
+                    vx = 0;
+                }
+            } else {
+                vx += ((-vx)*0.002); //空氣阻力
+                vy += -0.5; //重力
             }
-        } else {
-            vx += ((-vx)*0.002); //空氣阻力
-            vy += -0.5; //重力
         }
-    }
+
+        if (Math.abs(vx) < 0.1) vx = 0; // 防止速度過小抖動
+        if (Math.abs(vy) < 0.1) vy = 0;
+
 
         // 減少水平方向和垂直方向的摩擦力，並控制重力影響
         // vx *= 0.94;  // 減小摩擦，讓小鳥有更長的運動時間
@@ -607,8 +611,8 @@ class WoodenBlock {
         // 根據速度設置初始旋轉速度
         rotationSpeed = Math.abs(birdSpeedX + birdSpeedY) * 0.005;
         rotationAngle = 0; // 從無旋轉開始
-        vx = birdSpeedX / 4;
-        vy = birdSpeedY / 4;
+        vx = Math.max(Math.min(birdSpeedX / 4, 5), -5); // 限制水平速度
+        vy = Math.max(Math.min(birdSpeedY / 4, 5), -5); // 限制垂直速度 
 
         AngryBird.MusicPlayer hitSound = new AngryBird.MusicPlayer();
         hitSound .play("src/music/wood collision a1.wav");
@@ -638,10 +642,10 @@ class WoodenBlock {
         this.x = initialX;
         this.y = initialY;
         this.rotationAngle = 0;
-        hasCollided = false;
         this.vx = 0;
         this.vy = 0;
         this.rotationAngle = initialRotationAngle; // 恢復初始角度
         this.isFallingDown = false;
+        this.hasCollided = false; // 重置碰撞狀態
     }
 }
