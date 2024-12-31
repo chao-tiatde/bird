@@ -94,10 +94,6 @@ public class AngryBird {
                 clip.start();
             }
         }
-    
-        public static void main(String[] args) {
-            
-        }
     }
 
     static int lastBallX, lastBallY; // 上一幀小鳥的位置
@@ -126,7 +122,6 @@ public class AngryBird {
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    drag.play("src/music/slingshot streched.wav");
                     // 判斷是否點擊在小鳥內部
                     if (e.getX() >= ballX && e.getX() <= ballX + 32 &&
                         e.getY() >= ballY && e.getY() <= ballY + 32) {
@@ -134,6 +129,8 @@ public class AngryBird {
                         offsetX = e.getX() - ballX;
                         offsetY = e.getY() - ballY;
                         if (timer != null) timer.stop();
+                        
+                        drag.play("src/music/slingshot streched.wav");
                     }
                 }
 
@@ -178,7 +175,6 @@ public class AngryBird {
                         blueBirdSplit = true;
                         hideOriginalBlueBird = true;
                         System.out.println("藍色鳥分裂!");
-                        flySound.stop();
 
                         // 分裂成三個小鳥
                         splitBirds.add(new SplitBlueBird(ballX, ballY, vx * 0.8f, vy * 1.1f));
@@ -186,7 +182,9 @@ public class AngryBird {
                         splitBirds.add(new SplitBlueBird(ballX, ballY, vx, vy));
                         
                         AngryBird.MusicPlayer blueSound = new AngryBird.MusicPlayer();
-                        blueSound.play("src/music/bird next military a1.wav");
+                        
+                        // flySound.stop();
+                        // blueSound.play("src/music/bird next military a1.wav");
                     }
 
                     if (birdType == 3) {
@@ -412,10 +410,10 @@ public class AngryBird {
     public static void initWoodBlocks() {
         woodenBlocks.add(new WoodenBlock(950, 530, 30, 80));
         woodenBlocks.add(new WoodenBlock(1050, 530, 30, 80));
-        WoodenBlock block = new WoodenBlock(1000, 485, 30, 100);
+        /* WoodenBlock block = new WoodenBlock(1000, 485, 30, 100);
         block.rotationAngle = Math.PI / 2; // 初始傾斜 90 度
         block.initialRotationAngle = Math.PI / 2; // 記錄初始角度
-        woodenBlocks.add(block);
+        woodenBlocks.add(block); */
     }
 }
 
@@ -585,8 +583,7 @@ class WoodenBlock {
         if (hasCollided) return;
         hasCollided = true;
         isStanding = false;
-        AngryBird.MusicPlayer hitSound = new AngryBird.MusicPlayer();
-        hitSound .play("src/music/wood collision a1.wav");
+        
         // 根據碰撞點決定旋轉方向
         double hitPoint = birdRect.getCenterY();
         double blockCenter = y + height / 2.0;
@@ -598,6 +595,9 @@ class WoodenBlock {
         rotationAngle = 0; // 從無旋轉開始
         vx = birdSpeedX / 4;
         vy = birdSpeedY / 4;
+
+        AngryBird.MusicPlayer hitSound = new AngryBird.MusicPlayer();
+        hitSound .play("src/music/wood collision a1.wav");
     }
     
 
