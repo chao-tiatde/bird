@@ -155,7 +155,7 @@ public class AngryBird {
                         System.out.println("Calculated vx: " + vx + ", vy: " + vy);
                         System.out.println("Calculated e.getX(): " + e.getX() + ", offsetX: " + offsetX+ "ballX " + ballX);
                         // 在放開滑鼠後開始計時器
-                        timer = new Timer(10, _ -> {
+                        timer = new Timer(10, a -> {
                             moveBall();
                             checkCollision(); // 在每次更新小鳥位置後立即檢測碰撞
                         });
@@ -353,7 +353,7 @@ public class AngryBird {
 
         // 重置按鈕功能
         
-        btn.addActionListener(_ -> {
+        btn.addActionListener(e -> {
             ballX = 120;
             ballY = 550;
             enemy.reset(); // 重置敵人

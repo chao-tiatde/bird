@@ -8,7 +8,7 @@ import java.util.List;
 import javax.swing.*;
 
 
-public class huang0 {
+public class ground {
     static JFrame frm = new JFrame("憤怒鳥");
     static int ballX = 120, ballY = 550; // 小鳥的初始位置
     static int enemyX = 1000, enemyY = 580; // 敵人的初始位置
@@ -18,7 +18,7 @@ public class huang0 {
     static ArrayList<WoodenBlock> woodenBlocks = new ArrayList<>(); // 木板列表
 
     static ArrayList<Enemy> enemies = new ArrayList<>();//豬豬列表
-    //static Ground ground;
+    static Ground ground;
     
 
 
@@ -158,7 +158,7 @@ public class huang0 {
         private void checkCollision() {
             // 創建鳥的矩形，假設鳥的大小是 32x32
             Rectangle birdRect = new Rectangle(ballX, ballY, 32, 32);
-            //ground.checkCollision(birdRect);
+            ground.checkCollision(birdRect);
             
             // 檢查每個木板
             for (WoodenBlock block : woodenBlocks) {
@@ -261,7 +261,7 @@ public class huang0 {
         frm.setResizable(false);
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
-        //ground = new Ground(0, (AngryBird.pne.getHeight() - 130 +32), (AngryBird.pne.getWidth()), 200);
+        ground = new Ground(0, (AngryBird.pne.getHeight() - 130 +32), (AngryBird.pne.getWidth()), 200);
     }
 
     static void moveBall() {
@@ -274,19 +274,8 @@ public class huang0 {
             ballX -= vx;
             ballY -= vy;    
 
-            if (ballY >= pne.getHeight() - 130) {
-                ballY = pne.getHeight() - 130;
-                vy = 0;
-                //如果要解決往前往後發射著地減速問題，要再加邏輯判斷速度正負
-                if (vx < 0) {
-                    vx += 0.7;    
-                } else if (vx > 0) {
-                    vx = 0;
-                }
-            } else{
-                vx += ((-vx)*0.002); //空氣阻力
-                vy += -0.5; //重力
-            }
+            vx += ((-vx)*0.002); //空氣阻力
+            vy += -0.5; //重力
         }
         // 重新繪製界面
         pne.repaint();
@@ -392,8 +381,8 @@ class Enemy {
         y += vy; // 更新垂直位置
     
         // 防止超出地板（假設地板y=1160）
-        if (y > huang0.pne.getHeight() - 130) {
-            y = huang0.pne.getHeight() - 130;
+        if (y > AngryBird.pne.getHeight() - 130) {
+            y = AngryBird.pne.getHeight() - 130;
             vy = 0; // 停止垂直運動
             vx = 0; // 停止水平運動
         }
@@ -518,37 +507,39 @@ class WoodenBlock {
     }
 }
 
-// class Ground {
-//     // int x = 0, y = AngryBird.pne.getHeight() - 130;
-//     // int width = AngryBird.pne.getWidth(), height = 300;
-//     // int initialX, initialY;
-//     Rectangle groundRect;
-//     boolean reverse = false;
+class Ground {
+    // int x = 0, y = AngryBird.pne.getHeight() - 130;
+    // int width = AngryBird.pne.getWidth(), height = 300;
+    // int initialX, initialY;
+    Rectangle groundRect;
+    boolean reverse = false;
 
-//     public Ground(int x, int y, int w, int h) {
-//         groundRect = new Rectangle(x, y, w, h);
-//     }
+    public Ground(int x, int y, int w, int h) {
+        groundRect = new Rectangle(x, y, w, h);
+    }
 
-//     public boolean checkCollision(Rectangle birdRect) {
+    public boolean checkCollision(Rectangle birdRect) {
         
+        //鳥鳥有沒有碰到地板
+        if (groundRect.intersects(birdRect)) {
+            if (Math.abs(AngryBird.vy) < 4){
+                AngryBird.vy = 0; //y軸速度太小就不彈跳了
+            } else{
+                //速度夠就反彈
+                AngryBird.ballY = (groundRect.y -32);
+                AngryBird.vy += AngryBird.vy * -1.2;
+            }
 
-//         if (groundRect.intersects(birdRect)) {
-//             if (!reverse) {
-//                 if (Math.abs(AngryBird.vy) < 3){
-//                     AngryBird.vy += 0.5; //重力
-
-//                 }else{
-//                     System.out.println("=\n" + AngryBird.vy);
-//                     AngryBird.vy += AngryBird.vy * -1.4;
-//                     System.out.println(AngryBird.vy);
-//                 }
-//                 reverse = true;
-            
-//             }else if (Math.abs(AngryBird.vy) >= 3){
-//                     reverse = false;
-//             }
-            
-//         }
-//         return groundRect.intersects(birdRect);
-//     }
-// }
+            //撞到地板x軸速度也要減弱一點
+            if (AngryBird.vx < 0) {
+                if(Math.abs(AngryBird.vx) < 2) AngryBird.vx = 0;
+                else AngryBird.vx += 1;
+            } else if (AngryBird.vx > 0) {
+                if(Math.abs(AngryBird.vx) < 2) AngryBird.vx = 0;
+                else AngryBird.vx += -1;
+            }
+        }
+        return groundRect.intersects(birdRect);
+    }
+    
+}
