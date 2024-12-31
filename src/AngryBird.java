@@ -148,8 +148,8 @@ public class AngryBird {
                         dragging = false;
 
                         // 計算釋放時水平方向與垂直方向的速度，放大水平方向速度
-                        vx = (float) (e.getX() - offsetX - 120) ;  // 增大速度計算的放大倍數
-                        vy = (float) (e.getY() - offsetY - 550) ;  // 放大垂直方向速度
+                        vx = (float) ((e.getX() - offsetX - 120) * 0.3);  // 增大速度計算的放大倍數
+                        vy = (float) ((e.getY() - offsetY - 550) * 0.3);  // 放大垂直方向速度
 
                         // 記錄速度計算的日誌
                         System.out.println("Calculated vx: " + vx + ", vy: " + vy);
@@ -204,29 +204,29 @@ public class AngryBird {
                         ballY = Math.max(0, Math.min(e.getY() - offsetY, getHeight() - 32));
 
                         // 計算當前速度
-                        float tempVx = (float) (ballX - 120);
-                        float tempVy = (float) (ballY - 550);
+                        float tempVx = (float) ((ballX - 120) * 0.3);
+                        float tempVy = (float) ((ballY - 550) * 0.3);
 
                         // 清空路徑
                         trajectory.clear();
 
                         // 預測未來路徑
-                        float posX = ballX, posY = ballY;
-                        for (int i = 0; i < 100; i++) { // 計算 100 個點
+                        int posX = (120 + offsetX);
+                        int posY = (550 + offsetY);
+                        for (int i = 0; i < 300; i++) { // 計算 100 個點
                             posX -= tempVx;
                             posY -= tempVy;
-                            tempVx *= 0.94; // 模擬摩擦
-                            tempVy *= 0.9;
-                            tempVy += -1; // 重力影響
+                            tempVx += ((-tempVx)*0.002);
+                            tempVy += -0.5;
 
                             // 超出邊界停止
-                            if (posY >= getHeight() - 130) break;
+                            if ((posY >= getHeight() - 130 + 32) && posX >= (120 + offsetX)) break;
                             trajectory.add(new Point((int) posX, (int) posY));
                         }
 
                         // 更新速度
-                        birdSpeedX = (int) vx; // 記錄水平速度
-                        birdSpeedY = (int) vy; // 記錄垂直速度
+                        birdSpeedX = ballX - lastBallX;
+                        birdSpeedY = ballY - lastBallY;
 
                         // 記錄上一次位置
                         lastBallX = ballX;
@@ -390,18 +390,32 @@ public class AngryBird {
 
     static void moveBall() {
         // 更新小鳥的位置
-        ballX -= vx;
-        ballY -= vy;
-    
-        // 減少水平方向和垂直方向的摩擦力，並控制重力影響
-        vx *= 0.94;  // 減小摩擦，讓小鳥有更長的運動時間
-        vy *= 0.9;  // 減小摩擦力
-        vy += -1;     // 增加重力影響，調整重力使其更自然
-
+        //避免彈弓拉到地平面下觸發落地vy=0
+        if (ballX < 120 && ballY > 550) {
+            ballX -= (vx / 0.3);
+            ballY -= (vy / 0.3);
+        } else{
+            ballX -= vx;
+            ballY -= vy;      
+            
         if (ballY >= pne.getHeight() - 130) {
             ballY = pne.getHeight() - 130; // 修正小鳥位置
             vy = 0; // 停止垂直速度
+            if (vx < 0) {
+                vx += 0.7;    
+            } else if (vx > 0) {
+                vx = 0;
+            }
+        } else {
+            vx += ((-vx)*0.002); //空氣阻力
+            vy += -0.5; //重力
         }
+    }
+
+        // 減少水平方向和垂直方向的摩擦力，並控制重力影響
+        // vx *= 0.94;  // 減小摩擦，讓小鳥有更長的運動時間
+        // vy *= 0.9;  // 減小摩擦力
+        // vy += -1;     // 增加重力影響，調整重力使其更自然
     
         // 重新繪製界面
         pne.repaint();
